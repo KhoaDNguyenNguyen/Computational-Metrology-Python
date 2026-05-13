@@ -1,0 +1,50 @@
+\newtcbtheorem[auto counter, number within=chapter]{physcore}{Cơ sở vật lý}{
+  enhanced, breakable,
+  colback=gray!5, colframe=gray!60, coltitle=black,
+  % fonttitle=\bfseries\scshape,
+  fonttitle=\bfseries,
+  boxrule=0.5pt, leftrule=2pt,
+  attach boxed title to top left={yshift=-2mm, xshift=2mm},
+  boxed title style={colback=gray!20},
+  description font=\bfseries
+}{def}
+
+\newtcbtheorem[auto counter, number within=chapter]{derivation}{Khai triển toán học}{
+  enhanced, breakable,
+  colback=white, colframe=RoyalNavy, coltitle=RoyalNavy,
+  fonttitle=\bfseries,
+  boxrule=1pt, leftrule=4pt,
+  sharp corners, detach title,
+  before upper={\tcbtitle\par\vspace{0.5em}},
+  description font=\mdseries\itshape,
+  separator sign={: }
+}{drv}
+
+
+\newtcblisting{pycode}[1]{%
+  listing engine=minted,
+  minted language=python,
+  minted style=tango,
+  minted options={linenos, breaklines, fontsize=\small, numbersep=3mm},
+  colback=CodeBg, colframe=DeepTeal,
+  title=\textbf{Python Implementation:} #1,
+  fonttitle=\bfseries,
+  listing only,
+  left=5mm, enhanced,
+  boxrule=1pt,
+  drop shadow=black!10,
+  breakable
+}
+
+
+\newtcbtheorem[auto counter, number within=chapter]{pitfall}{Sai lầm thường gặp}{
+  enhanced, breakable,
+  colback=red!2, colframe=Crimson, coltitle=white,
+  fonttitle=\bfseries,
+  boxrule=1pt, leftrule=4pt,
+  sharp corners, 
+  attach boxed title to top left={yshift=-2mm, xshift=2mm},
+  boxed title style={colback=Crimson, sharp corners},
+  description font=\mdseries\itshape,
+  separator sign={: }
+}{warn}

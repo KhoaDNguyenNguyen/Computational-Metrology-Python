@@ -1,0 +1,78 @@
+% --- Geometry & Layout ---
+\usepackage{geometry}
+\geometry{
+    paper=a4paper,
+    inner=28mm, outer=32mm, top=30mm, bottom=35mm,
+    marginparwidth=25mm, marginparsep=5mm,
+    headheight=15pt
+}
+\usepackage{fontspec}
+\usepackage{mathtools}
+\usepackage{unicode-math}
+
+
+\setmainfont{texgyretermes}[
+  Extension      = .otf ,
+  UprightFont    = *-regular ,
+  BoldFont       = *-bold ,
+  ItalicFont     = *-italic ,
+  BoldItalicFont = *-bolditalic ,
+]
+\setmathfont{TeX Gyre Termes Math} 
+
+\usepackage{polyglossia} 
+\setdefaultlanguage{vietnamese}
+
+\usepackage{microtype}     
+\usepackage{setspace}        
+
+
+\setstretch{1.4}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
+\setlength{\jot}{16pt}
+\allowdisplaybreaks
+
+
+\usepackage{amsmath, amsfonts, mathtools}
+\usepackage{physics}
+\usepackage{siunitx}
+\usepackage{bm}
+
+\usepackage{xcolor}
+\definecolor{RoyalNavy}{HTML}{002366}
+\definecolor{DeepTeal}{HTML}{006064}
+\definecolor{Charcoal}{HTML}{36454F}
+\definecolor{Crimson}{HTML}{B71C1C}
+\definecolor{CodeBg}{HTML}{F8F9FA}
+
+
+\usepackage[most, minted]{tcolorbox}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\small\scshape\color{Charcoal}\nouppercase{\leftmark}}
+\fancyhead[RO]{\small\scshape\color{Charcoal}\nouppercase{\rightmark}}
+\fancyfoot[LE,RO]{\small\thepage}
+\renewcommand{\headrulewidth}{0.5pt}
+
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\bfseries\huge\color{RoyalNavy}}
+  {\flushright\LARGE\textsc{\chaptertitlename} \thechapter}
+  {0pt}
+  {\rule{\textwidth}{2pt}\\[0.5ex]\raggedright}
+\titlespacing{\chapter}{0pt}{0pt}{40pt}
+
+\titleformat{\section}{\Large\bfseries\color{DeepTeal}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries\color{Charcoal}}{\thesubsection}{1em}{}
+
+
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=RoyalNavy,
+    citecolor=Crimson,
+    urlcolor=DeepTeal
+}
