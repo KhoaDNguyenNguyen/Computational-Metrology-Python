@@ -1,0 +1,50 @@
+\chapter{Tiền xử lý và trực quan hóa dữ liệu}
+\section{Nạp và tiền xử lý dữ liệu thực nghiệm}
+
+Việc ứng dụng ngôn ngữ lập trình Python mang lại hiệu quả cao trong khâu tự động hóa quá trình nạp dữ liệu (data ingestion) từ các thiết bị đo lường. Trong thực nghiệm vật lý, các hệ thống cảm biến tự động thường trích xuất dữ liệu dưới dạng bảng với mật độ lấy mẫu thời gian cao. Việc thiết lập các scripts không chỉ hỗ trợ xử lý dữ liệu hàng loạt nhằm duy trì tính nhất quán, mà còn giúp giảm thiểu đáng kể rủi ro sai lệch phương pháp thường phát sinh khi thao tác thủ công trên các phần mềm bảng tính truyền thống.
+
+\begin{physcore}{Đặc tính động học của vật thể rơi tự do}{free_fall_kinematics}
+Bài toán rơi tự do được xem xét như một ví dụ minh họa (illustrative case study) cho phương pháp xử lý dữ liệu đo lường tổng quát. Đặc trưng cơ bản của hệ thống này là gia tốc chuyển động duy trì giá trị không đổi ($a = g$). Theo đó, phương trình độ dịch chuyển $s(t)$ tuân theo quy luật đa thức bậc hai đối với thời gian, trong khi đại lượng vận tốc tức thời $v(t)$ biến thiên tuyến tính. Việc tự động hóa khâu nạp và tiền xử lý mảng dữ liệu tọa độ từ cảm biến là nền tảng cốt lõi để kiểm chứng các đặc tính vật lý này.
+\end{physcore}
+
+% \begin{pitfall}{Rủi ro sai lệch cấu trúc khi nạp dữ liệu từ tệp ngoại vi}{cassy_format_risk}
+\begin{pitfall}{Hiện tượng sai lệch cấu trúc do định dạng khu vực (local formatting)}{cassy_format_risk}
+Dữ liệu thô xuất ra từ các cảm biến lấy mẫu tự động (như hệ thống CASSY) thường chịu ảnh hưởng của các tiêu chuẩn định dạng khu vực (local formatting) – điển hình như việc sử dụng dấu phẩy thay cho dấu chấm ở phần thập phân, hoặc dùng dấu chấm phẩy làm ký tự phân cách (delimiter). Việc bỏ sót bước chuẩn hóa định dạng trong quá trình nạp tệp dễ dẫn đến hiện tượng sai lệch cấu trúc (structural data drift), khiến hệ thống phân tích nhận diện nhầm mảng giá trị số học (float) thành chuỗi ký tự (string). Nhằm duy trì tính tái lập (reproducibility) và khắc phục rủi ro này, ta tiến hành nạp dữ liệu trực tiếp từ các tệp lưu trữ ngoại vi (chẳng hạn định dạng \texttt{.csv}), kết hợp khai báo tường minh các tham số phân tách thông qua các hàm nạp dữ liệu chuẩn.
+\end{pitfall}
+
+Thư viện \texttt{pandas} cung cấp cấu trúc dữ liệu DataFrame mạnh mẽ, cho phép nạp trực tiếp luồng dữ liệu thực nghiệm từ tệp lưu trữ và chuyển đổi liền mạch sang định dạng mảng (array) của thư viện \texttt{numpy} để phục vụ các phép toán vector hóa ở những bước tiếp theo.
+
+\begin{pycode}{Automated data ingestion and array conversion}
+import pandas as pd
+import numpy as np
+
+# Ingesting the master dataset directly from an external CSV file
+df = pd.read_csv('kinematics_data.csv')
+time_data = df['Time_s'].values
+displacement_data = df['Displacement_m'].values
+\end{pycode}
+
+Sau khi dữ liệu cơ sở được chuyển đổi về định dạng mảng, quy trình phân tích sẽ tiến hành tính toán các đại lượng động học thứ cấp. Đối với các hệ thống tự động, biến độc lập (thời gian) và biến phụ thuộc (độ dịch chuyển) thường được ghi nhận trực tiếp. Do đó, vận tốc tức thời cần được ước lượng gián tiếp thông qua các kỹ thuật toán học.
+
+\begin{derivation}{Phương pháp vi phân số học cho vận tốc tức thời}{num_diff_velocity}
+Giả sử tập dữ liệu thực nghiệm được biểu diễn dưới dạng các cặp giá trị rời rạc $(t_i, s_i)$. Theo định nghĩa của đạo hàm, vận tốc tức thời $v$ trên một khoảng thời gian giữa hai điểm đo liên tiếp có thể được ước lượng thông qua phương pháp vi phân số học (numerical differentiation):
+\begin{equation}
+    v_i \approx \frac{\Delta s_i}{\Delta t_i} = \frac{s_{i+1} - s_i}{t_{i+1} - t_i}
+\end{equation}
+Giá trị xấp xỉ này phản ánh sát nhất vận tốc tại thời điểm nằm chính giữa khoảng lấy mẫu. Vì vậy, ta cần thiết lập một hệ trục thời gian trung gian (mid-point times) tương ứng với mảng vận tốc vừa được dẫn xuất:
+\begin{equation}
+    t_{\text{mid}, i} = t_i + \frac{\Delta t_i}{2}
+\end{equation}
+\end{derivation}
+
+Sự biến thiên $\Delta s$ và $\Delta t$ trên toàn bộ tập dữ liệu được tự động ước lượng thông qua hàm \texttt{np.diff}. Việc ứng dụng các hàm tính toán mảng (vectorized operations) trên môi trường Python giúp hạn chế sự phụ thuộc vào các vòng lặp thủ công, từ đó tối ưu hóa tốc độ xử lý đối với những tập dữ liệu đo lường có quy mô lớn.
+
+\begin{pycode}{Numerical differentiation for kinematic derivation}
+# Perform numerical differentiation to approximate instantaneous velocity: v = (s_i+1 - s_i) / (t_i+1 - t_i)
+delta_s = np.diff(displacement_data)
+delta_t = np.diff(time_data)
+velocity_data = delta_s / delta_t
+
+# Compute corresponding mid-point times for the derived velocity array
+time_midpoints = time_data[:-1] + delta_t / 2.0
+\end{pycode}

@@ -1,0 +1,53 @@
+\section{Hồi quy tuyến tính và đánh giá chỉ số R-bình phương}
+\label{sec:linear_regression}
+
+Trong hệ thống xử lý dữ liệu cảm biến tự động, phương pháp hồi quy không chỉ được giới hạn ở các phương trình bậc cao đối với tọa độ không gian. Trong bài toán minh họa, vận tốc tức thời $v(t)$ – đại lượng được tính trước đó bằng phương pháp vi phân số từ mảng dữ liệu gốc – tuân theo một mô hình tuyến tính đơn giản. Việc áp dụng thuật toán hồi quy tuyến tính (linear regression) lên tập dữ liệu này cung cấp một cách kiểm tra độc lập cho toàn bộ quy trình xử lý dữ liệu (internal consistency) của toàn bộ quy trình đo lường.
+
+\begin{derivation}{Mô hình hồi quy tuyến tính cho đại lượng dẫn xuất}{linear_velocity_derivation}
+Dựa trên phương trình chuyển động cơ bản, vận tốc tức thời $v$ của một vật thể rơi tự do biến thiên theo hàm bậc nhất đối với chuỗi thời gian $t$:
+\begin{equation}
+    v(t) = gt + v_0 \label{eq:velocity_theoretical}
+\end{equation}
+Khi đối chiếu phương trình \ref{eq:velocity_theoretical} với cấu trúc hồi quy tuyến tính tổng quát $y = ax + b$, ta có thể rút ra hệ quả sau:
+\begin{itemize}
+    \item \textbf{Hệ số góc (Slope) $a$}: Tương ứng với tham số gia tốc trọng trường $g$. Đây là một phương pháp độc lập để xác định $g$, giúp kiểm tra chéo với kết quả từ mô hình hồi quy phi tuyến của tọa độ.
+    \item \textbf{Tung độ gốc (Intercept) $b$}: Tương ứng với tham số vận tốc ban đầu $v_0$. Việc ghi nhận bất kỳ sự sai lệch nào của $v_0$ so với giá trị $0$ (giả định vật được giải phóng từ trạng thái nghỉ) đều cung cấp cơ sở để đánh giá độ trễ kích hoạt của cảm biến (trigger delay).
+\end{itemize}
+\end{derivation}
+
+Tương tự như quy trình tối ưu hóa trước, hàm \texttt{curve\_fit} tiếp tục được tái sử dụng để hồi quy mô hình với tập dữ liệu vận tốc. Điểm quan trọng của bước này là việc nạp trực tiếp mảng độ bất định của vận tốc (\texttt{velocity\_errs}) – vốn đã được lan truyền tự động thông qua đối tượng \texttt{uarray} – làm trọng số thống kê thông qua đối số \texttt{sigma}.
+
+\begin{pycode}{Linear regression of derived velocity}
+# Execute linear curve fitting for Velocity data
+popt_v, pcov_v = curve_fit(
+    linear_velocity_model,
+    time_midpoints,
+    velocity_vals,
+    sigma=velocity_errs,
+    absolute_sigma=True,
+    p0=[9.8, 0.0]
+)
+
+g_v_opt, v0_v_opt = popt_v
+g_v_err = np.sqrt(np.diag(pcov_v))[0]
+
+# R^2 for Displacement
+ss_res_s = np.sum((displacement_data - quadratic_displacement_model(time_data, *popt_s))**2)
+ss_tot_s = np.sum((displacement_data - np.mean(displacement_data))**2)
+r2_s = 1 - (ss_res_s / ss_tot_s)
+
+# R^2 for Velocity
+ss_res_v = np.sum((velocity_vals - linear_velocity_model(time_midpoints, *popt_v))**2)
+ss_tot_v = np.sum((velocity_vals - np.mean(velocity_vals))**2)
+r2_v = 1 - (ss_res_v / ss_tot_v)
+
+print(f"Gravitational Acceleration (Displacement Fit): {g_s_opt:.3f} +/- {g_s_err:.3f} m/s^2")
+print(f"Gravitational Acceleration (Velocity Fit): {g_v_opt:.3f} +/- {g_v_err:.3f} m/s^2")
+\end{pycode}
+
+Bên cạnh ma trận hiệp phương sai nhằm đánh giá độ bất định của các tham số, hệ số xác định (coefficient of determination - $R^2$) là một chỉ số dùng để đánh giá mức độ phù hợp của mô hình của đường cong hồi quy. Giá trị $R^2$ biểu thị tỷ lệ phương sai của biến phụ thuộc có thể được giải thích bởi mô hình lý thuyết. Đối với đối với một mô hình vật lý có độ phù hợp tốt, giá trị $R^2$ thường rất gần $1$ trong các bài toán động học ít nhiễu.
+
+% \begin{pitfall}{Ép buộc tung độ gốc trong hồi quy tuyến tính đo lường}{forcing_intercept}
+\begin{pitfall}{Sai lệch hệ thống khi cưỡng chế tung độ gốc của mô hình tuyến tính}{forcing_intercept}
+Một rủi ro phương pháp luận đáng chú ý là việc chủ quan cấu hình hàm số để loại bỏ tham số tự do (ví dụ: ép mô hình về dạng $v(t) = gt$). Việc ép đường hồi quy đi qua gốc tọa độ mà thiếu cơ sở kiểm định sẽ làm mất đi khả năng phát hiện các sai lệch hệ thống về thời gian đồng bộ (synchronization error) của thiết bị đo. Hậu quả là thuật toán tối ưu hóa sẽ tự động bù trừ sai số này vào hệ số góc, dẫn đến việc ước lượng thông số chính (như gia tốc $g$) bị sai lệch nghiêm trọng.
+\end{pitfall}

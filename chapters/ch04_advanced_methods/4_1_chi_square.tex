@@ -1,0 +1,51 @@
+\chapter{Kỹ thuật chẩn đoán mô hình nâng cao}
+
+\section{Đánh giá mô hình với tiêu chuẩn Chi bình phương rút gọn}
+\label{sec:reduced_chi_square}
+
+Đánh giá mức độ phù hợp của mô hình (goodness-of-fit) là bước cốt lõi trong phân tích dữ liệu thực nghiệm sau khi các tham số động học đã được ước lượng. Trong phương pháp hồi quy áp dụng cho hệ thống đo lường thực nghiệm, việc chỉ đánh giá chất lượng mô hình dựa trên hệ số xác định (coefficient of determination - $R^2$) có thể chưa phản ánh đầy đủ chất lượng mô hình, do bản thân chỉ số $R^2$ không phản ánh được giới hạn sai số hệ thống của các thiết bị cảm biến.
+
+\begin{physcore}{Giới hạn của hệ số $R^2$ và vai trò của Chi bình phương rút gọn}{rsquared_limit}
+Hệ số $R^2$ biểu diễn tỷ lệ phương sai của đại lượng phụ thuộc được giải thích bởi mô hình hồi quy. Tuy nhiên, đại lượng này có một số hạn chế trong đo lường vật lý: nó không tích hợp độ bất định (uncertainty) do các ranh giới độ phân giải của thiết bị (instrumental limits) gây ra. Giá trị Chi bình phương rút gọn (reduced chi-square) được áp dụng nhằm giải quyết giới hạn này, giúp đánh giá độ tương thích của đường cong hồi quy trên cơ sở xét đến trọng số bất định của từng điểm dữ liệu cụ thể.
+\end{physcore}
+
+Việc đánh giá độ lệch giữa mô hình và dữ liệu đo thông qua phương sai giúp phát hiện các vấn đề trong mô hình hồi quy.
+
+\begin{derivation}{Công thức và ý nghĩa thống kê của Chi bình phương rút gọn}{chi_square_drv}
+Hàm mục tiêu Chi bình phương ($\chi^2$) là tổng bình phương các phần dư (residuals) được chuẩn hóa (normalized) bởi độ bất định đo lường của từng điểm dữ liệu:
+\begin{equation}
+    \chi^2 = \sum_{i=1}^{N} \left[ \frac{s_i - f(t_i, \theta)}{\sigma_s} \right]^2
+    \label{eq:chi_square}
+\end{equation}
+Trong đó, $N$ là tổng số lượng điểm lấy mẫu, $s_i$ là tọa độ thực nghiệm, $f(t_i, \theta)$ là giá trị ước lượng từ hàm hồi quy, và $\sigma_s$ là độ lệch chuẩn tuyệt đối phản ánh giới hạn đo lường.
+
+Tiêu chuẩn Chi bình phương rút gọn $\chi^2_\nu$ được thiết lập bằng cách chia giá trị hàm mục tiêu cho số bậc tự do (degrees of freedom) $\nu$:
+\begin{equation}
+    \chi^2_\nu = \frac{\chi^2}{\nu} = \frac{\chi^2}{N - M}
+    \label{eq:reduced_chi_square}
+\end{equation}
+Với $M$ là số lượng tham số tự do trong hàm hồi quy. Giá trị $\chi^2_\nu$ cung cấp cơ sở thống kê để đánh giá chất lượng của mô hình:
+\begin{itemize}
+    \item $\chi^2_\nu \approx 1$: Mô hình phù hợp tốt với dữ liệu. Độ biến thiên của phần dư phù hợp với mức độ nhiễu ngẫu nhiên kỳ vọng từ giới hạn phân giải thiết bị.
+    \item $\chi^2_\nu \gg 1$: Mô hình chưa mô tả tốt dữ liệu (underfitting) hoặc cho thấy mô hình vật lý có thể chưa đầy đủ.
+    \item $\chi^2_\nu \ll 1$: Mô hình bị overfit (overfitting), hoặc độ bất định $\sigma_s$ đã bị ước lượng cao hơn thực tế (overestimated) quá mức.
+\end{itemize}
+\end{derivation}
+
+Đoạn mã sau thực hiện việc tính toán thông số chẩn đoán này đối với hàm hồi quy không gian (độ dịch chuyển). Việc thiết lập thuật toán không đòi hỏi các gói thư viện phức tạp mà được cấu trúc hoàn toàn dựa trên các phép toán vector hóa của mô-đun \texttt{numpy}.
+
+\begin{pycode}{Implement reduced Chi-Square metric for displacement}
+# 1. Implement Reduced Chi-Square Metric for the Displacement Model
+residuals_s = displacement_data - quadratic_displacement_model(time_data, *popt_s)
+normalized_residuals_s = residuals_s / sigma_s
+chi_square_s = np.sum(normalized_residuals_s**2)
+degrees_of_freedom_s = len(displacement_data) - len(popt_s)
+reduced_chi_square_s = chi_square_s / degrees_of_freedom_s
+
+print(f"Reduced Chi-Square (Displacement Model): {reduced_chi_square_s:.4f}")
+\end{pycode}
+
+% \begin{pitfall}{Rủi ro quá khớp thông qua thao tác tăng bậc đa thức}{overfit_warning}
+ \begin{pitfall}{Hiện tượng quá khớp (overfitting) do gia tăng bậc đa thức mô hình}{overfit_warning}
+Trong quá trình hiệu chỉnh mô hình, việc tăng bậc của đa thức hồi quy thường được lạm dụng nhằm tối đa hóa chỉ số $R^2$. Dù một hàm toán học bậc cao có thể làm đường cong bám sát mọi điểm trong tập dữ liệu hữu hạn, thao tác này tất yếu làm gia tăng số lượng tham số $M$, làm giảm số bậc tự do $\nu$. Hệ quả là $\chi^2_\nu$ giảm xuống thấp hơn nhiều so với $1$, phản ánh một trạng thái quá khớp (overfitting). Việc cố ý phức tạp hóa cấu trúc toán học để bù đắp nhiễu ngẫu nhiên làm mất ý nghĩa vật lý của mô hình, giảm khả năng khái quát hóa của mô hình.
+\end{pitfall}

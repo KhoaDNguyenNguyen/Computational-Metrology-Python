@@ -1,0 +1,42 @@
+\section{Tự động hóa lan truyền sai số với thư viện uncertainties}
+\label{sec:python_uncertainties}
+
+Trong phân tích dữ liệu thực nghiệm quy mô lớn, việc áp dụng phương pháp giải tích truyền thống cho từng điểm đo để đánh giá mức độ lan truyền độ bất định (error propagation) thường vấp phải giới hạn về khối lượng tính toán và hiệu suất. Nhằm giải quyết rào cản này trong các hệ thống xử lý dữ liệu cảm biến tự động, ta có thể áp dụng thư viện \texttt{uncertainties} thuộc hệ sinh thái Python. Đây là một công cụ chuyên biệt được thiết kế để tự động hóa quy trình đánh giá độ bất định thông qua phương pháp vi phân tuyến tính cục bộ.
+
+\begin{physcore}{Mảng dữ liệu mang sai số trong không gian lập trình}{uarray_concept}
+Khác biệt với các kiểu mảng vô hướng (scalar arrays) tiêu chuẩn, thư viện \texttt{uncertainties} (thông qua mô đun con \texttt{unumpy}) biểu diễn các tập dữ liệu đo lường vật lý dưới dạng cấu trúc mảng mang sai số (uncertainty-bearing arrays) thông qua đối tượng \texttt{uarray}. Mỗi phần tử trong mảng này tích hợp đồng thời hai trường thông tin: giá trị danh định (nominal value) và độ bất định tuyệt đối (absolute uncertainty) đặc trưng cho giới hạn phân giải của thiết bị. Khi các mảng này tham gia vào những phép toán đại số hoặc vi phân, thuật toán cốt lõi sẽ tự động tính toán ma trận Jacobi và lan truyền sai số tương ứng cho toàn bộ mảng kết quả tại thời điểm thực thi.
+\end{physcore}
+
+Khi áp dụng phương pháp này vào bài toán minh họa động học rơi tự do, mảng dữ liệu tọa độ và thời gian được tích hợp trực tiếp các giới hạn bất định từ thiết bị. Dựa trên thông số kỹ thuật của hệ thống CASSY, giới hạn độ phân giải không gian (spatial resolution) được xác định ở mức $1$ mm ($\sigma_s = 0.001$ m), trong khi giới hạn độ phân giải thời gian (temporal resolution) đạt $0.5$ ms ($\sigma_t = 0.0005$ s).
+
+Trong môi trường lập trình, việc chuyển đổi từ không gian tọa độ sang mảng vận tốc tức thời được thực hiện thông qua thuật toán vi phân số học. Trong quá trình này, các phép toán vector hóa trên đối tượng \texttt{uarray} sẽ tự động định tuyến và tổng hợp phương sai qua từng bước tính toán, ước lượng ra một mảng vận tốc hoàn chỉnh bao gồm độ bất định độc lập cho từng điểm dữ liệu.
+
+\begin{pycode}{Automated error propagation during numerical differentiation}
+# Assign standard instrumental uncertainties based on CASSY sensor limitations
+sigma_s = 0.001   # Estimated spatial resolution: 1 mm
+sigma_t = 0.0005  # Estimated temporal resolution: 0.5 ms
+
+# Initialize uncertainty-bearing arrays
+s_u = unp.uarray(displacement_data, sigma_s)
+t_u = unp.uarray(time_data, sigma_t)
+
+# Automate error propagation during numerical differentiation
+ds_u = s_u[1:] - s_u[:-1]
+dt_u = t_u[1:] - t_u[:-1]
+v_u = ds_u / dt_u
+
+# Extract nominal values and dynamically computed uncertainties
+velocity_vals = unp.nominal_values(v_u)
+velocity_errs = unp.std_devs(v_u)
+
+print(f"Propagated Velocity Example [Index 5]: {v_u[5]:.4u} m/s")
+\end{pycode}
+
+Việc trích xuất các mảng giá trị danh định thông qua hàm \texttt{unp.nominal\_values()} và mảng độ bất định thông qua \texttt{unp.std\_devs()} là thao tác chuẩn bị quan trọng. Sau khi trích xuất, dữ liệu được sắp xếp lại để tương thích với các hàm hồi quy (curve fitting) và các kỹ thuật trực quan hóa ở những bước tiếp theo.
+
+% \begin{pitfall}{Phân mảnh cấu trúc dữ liệu trong phân tích động học}{data_fragmentation_risk}
+\begin{pitfall}{Hiện tượng mất đồng bộ chỉ mục (index) giữa các mảng dữ liệu}{data_fragmentation_risk}
+Một rủi ro phương pháp luận thường gặp khi xử lý dữ liệu vật lý tự động hóa là việc duy trì song song và độc lập mảng giá trị danh định và mảng độ bất định. Cách xử lý tách riêng hai mảng này dễ gây mất đồng bộ dữ liệu và mất đồng bộ chỉ mục (index desynchronization) khi hệ thống áp dụng các bộ lọc dữ liệu. Phương thức tiếp cận thông qua đối tượng \texttt{uarray} giúp giải quyết vấn đề này bằng cách đóng gói hai thực thể toán học vào một phần tử duy nhất, từ đó duy trì tính nhất quán của dữ liệu và sai số qua từng bước xử lý.
+\end{pitfall}
+
+Việc chuyển từ tính toán thủ công sang xử lý mảng tự động hóa mảng mang lại lợi ích đáng kể về hiệu suất phân tích. Việc áp dụng trực tiếp các phép vi phân dựa trên đối tượng tích hợp sai số giúp giảm nguy cơ sai sót đại số (algebraic errors), cải thiện tính minh bạch của mã nguồn (code readability) và nâng cao khả năng tái lập (reproducibility) của thực nghiệm, đặc biệt khi quy mô tập dữ liệu được mở rộng.

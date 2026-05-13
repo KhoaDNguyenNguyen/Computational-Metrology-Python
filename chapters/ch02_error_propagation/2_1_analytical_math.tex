@@ -1,0 +1,55 @@
+\chapter{Lan truyền sai số giải tích và tự động hóa}
+\section{Lan truyền sai số giải tích thông qua đại số máy tính}
+\label{sec:analytical_error_propagation}
+
+Trong quy trình đo lường học tính toán, nhiều đại lượng vật lý cốt lõi không được ghi nhận trực tiếp từ thiết bị cảm biến mà được ước lượng gián tiếp thông qua các hàm toán học đa biến. Phương pháp vi phân toàn phần (total differential method) là công cụ giải tích nền tảng được ứng dụng nhằm đánh giá độ bất định (uncertainty) của các phép đo gián tiếp dựa trên nguyên lý lan truyền sai số (error propagation).
+
+Khi áp dụng phương pháp luận tổng quát này vào bài toán minh họa động học rơi tự do, vận tốc tức thời $v$ được dẫn xuất từ sự biến thiên của không gian tọa độ $s$ và chuỗi thời gian $t$ tại hai điểm đo kế tiếp (điểm $i$ và điểm $j$, với $j = i+1$). Biểu thức toán học cốt lõi được định nghĩa như sau:
+
+\begin{equation}
+    v = \frac{s_j - s_i}{t_j - t_i}
+    \label{eq:derived_velocity}
+\end{equation}
+
+Mức độ lan truyền độ bất định từ các biến số đầu vào (bản thân chúng đã chứa đựng sai số hệ thống từ thiết bị đo) sang đại lượng dẫn xuất $v$ được đánh giá chặt chẽ thông qua việc khai triển vi phân toàn phần.
+
+\begin{derivation}{Khai triển vi phân toàn phần cho đại lượng dẫn xuất}{velocity_differential}
+Theo nguyên lý lan truyền độ bất định chuẩn (standard error propagation), độ bất định tổng hợp $u_v$ của đại lượng dẫn xuất được định nghĩa thông qua căn bậc hai của tổng bình phương các vi phân riêng phần (partial differentials). Từ phương trình \ref{eq:derived_velocity}, ta có thể thiết lập biểu thức giải tích tổng quát:
+
+\begin{equation}
+    u_v = \sqrt{ \left( \frac{\partial v}{\partial s_i} u_{s_i} \right)^2 + \left( \frac{\partial v}{\partial s_j} u_{s_j} \right)^2 + \left( \frac{\partial v}{\partial t_i} u_{t_i} \right)^2 + \left( \frac{\partial v}{\partial t_j} u_{t_j} \right)^2 }
+    \label{eq:velocity_uncertainty}
+\end{equation}
+
+Trong đó, các hệ số nhạy (sensitivity coefficients) biểu thị mức độ tác động của từng biến độc lập lên kết quả ước lượng cuối cùng, tương ứng với các đạo hàm riêng (partial derivatives) được khai triển. Đối với các biến số tại thời điểm kết thúc ($s_j$ và $t_j$), hệ thống đạo hàm này được xác định cụ thể:
+
+\begin{align}
+    \frac{\partial v}{\partial s_j} &= \frac{1}{t_j - t_i} \label{eq:partial_sj} \\
+    \frac{\partial v}{\partial t_j} &= - \frac{s_j - s_i}{(t_j - t_i)^2} \label{eq:partial_tj}
+\end{align}
+\end{derivation}
+
+Việc thiết lập các biểu thức giải tích cung cấp một cơ sở toán học tường minh về mức độ đóng góp của từng đại lượng thành phần vào độ bất định tổng quát. Mặc dù vậy, quy trình thực thi này bộc lộ những giới hạn nhất định khi mở rộng sang các hệ thống động học phức tạp hơn.
+
+% \begin{pitfall}{Rủi ro sai lệch trong phân tích giải tích thủ công}{analytical_risk}
+\begin{pitfall}{Hạn chế về tính toàn vẹn của phương pháp giải tích thủ công}{analytical_risk}
+Một rủi ro phương pháp luận thường gặp là việc tính toán giải tích thủ công đối với các biểu thức phi tuyến nhiều biến số rất dễ phát sinh sai số đại số. Thao tác khai triển đạo hàm riêng thường dẫn đến việc nhầm lẫn về dấu hoặc bỏ sót số hạng. Những khiếm khuyết toán học này, nếu không được kiểm chứng chéo độc lập, sẽ làm sai lệch đáng kể khoảng tin cậy (confidence interval) của kết quả khi mô hình được áp dụng trên tập dữ liệu hàng nghìn điểm lấy mẫu từ các thiết bị đo lường tự động.
+\end{pitfall}
+
+Để giảm thiểu tối đa rủi ro từ các thao tác thủ công và tối ưu hóa độ tin cậy của thuật toán, kỹ thuật hệ thống đại số máy tính (computer algebra system) trên môi trường Python được tích hợp nhằm tự động hóa quy trình vi phân. Thư viện \texttt{sympy} cho phép tính toán trực tiếp trên các biểu thức tượng trưng (symbolic expressions), đảm bảo tính toàn vẹn của cấu trúc toán học trước khi chuyển giao tham số vào các phép toán vector hóa (vectorized operations) nhằm xử lý chuỗi mảng dữ liệu.
+
+\begin{pycode}{Automated Partial Derivative Extraction using SymPy}
+import sympy as sp
+from uncertainties import unumpy as unp
+
+# Define symbolic variables for the partial derivative extraction
+s_i, s_j, t_i, t_j = sp.symbols('s_i s_j t_i t_j')
+v_expr = (s_j - s_i) / (t_j - t_i)
+
+# Automate partial derivative extraction to verify theoretical error propagation
+print("Analytical Partial Derivative w.r.t final position (s_j):")
+sp.pprint(sp.diff(v_expr, s_j))
+print("\nAnalytical Partial Derivative w.r.t final time (t_j):")
+sp.pprint(sp.diff(v_expr, t_j))
+print("\n" + "="*50 + "\n")
+\end{pycode}
