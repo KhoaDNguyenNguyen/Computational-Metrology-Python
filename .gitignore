@@ -1,0 +1,30 @@
+# LaTeX Core & Auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.listing
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+
+# Minted & Pygments artifacts
+_minted*/
+
+# Python / Jupyter
+.ipynb_checkpoints/
+__pycache__/
+
+# AI Prompts & CI Scripts (Hidden from portfolio)
+*.prompt
+prompt_*.txt
+git_publish.sh
+*.sh
+
+# OS specific
+.DS_Store
+.vscode/
