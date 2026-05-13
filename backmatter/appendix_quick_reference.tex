@@ -1,0 +1,123 @@
+\chapter{Cẩm nang tra cứu nhanh thuật toán (Methodological Quick Reference)}
+\label{app:quick_reference}
+
+Phụ lục này tổng hợp các thuật toán cốt lõi được ứng dụng xuyên suốt tài liệu này nhằm tối ưu hóa thời gian triển khai quy trình phân tích dữ liệu đo lường tự động hóa. Các khối mã lệnh được đóng gói dưới dạng mẫu mã tham khảo (reference templates), cho phép tái sử dụng linh hoạt trong mọi quy trình xử lý dữ liệu cảm biến tổng quát. Các bước thực thi trải dài từ khâu nạp dữ liệu ngoại vi (tệp \texttt{.csv}), lan truyền độ bất định, tối ưu hóa hồi quy đến chẩn đoán thống kê nâng cao, trong đó bài toán động học rơi tự do được trình bày như một trường hợp minh họa thực tiễn.
+
+\begin{physcore}{Định hướng mô đun hóa trong mã nguồn khoa học}{modular_code}
+Việc xây dựng hệ thống phân tích dữ liệu thực nghiệm đòi hỏi sự ứng dụng thống nhất nguyên lý mô đun hóa (modularity). Thay vì thiết lập các mã nguồn nguyên khối (monolithic scripts), cấu trúc thuật toán cần được phân tách thành các khối logic độc lập (bao gồm: tiền xử lý, lan truyền sai số, hồi quy, chẩn đoán). Kiến trúc này hỗ trợ tính khả năng mở rộng (portability) khi mở rộng quy trình phân tích từ mô hình minh họa sang các hệ thống vật lý phức tạp hơn, đồng thời giảm thiểu rủi ro phát sinh sai lệch hệ thống trong chuỗi xử lý tự động.
+\end{physcore}
+
+\section*{A.1. Tự động hóa lan truyền độ bất định (Automated Error Propagation)}
+
+Quy trình chuẩn hóa khởi đầu bằng việc nạp trực tiếp tập dữ liệu từ tệp \texttt{.csv} ngoại vi, tiếp nối bằng thuật toán tính toán đại lượng dẫn xuất (như vận tốc tức thời từ vi phân tọa độ). Kỹ thuật này đi kèm với việc bảo toàn ma trận sai số thống kê thông qua cấu trúc \texttt{uarray} của thư viện \texttt{uncertainties}.
+
+\begin{pycode}{Data ingestion, numerical differentiation and error propagation}
+import pandas as pd
+import numpy as np
+import sympy as sp
+from uncertainties import unumpy as unp
+
+# Standard data ingestion from an external CSV file
+df = pd.read_csv('kinematics_data.csv')
+time_data = df['Time_s'].values
+displacement_data = df['Displacement_m'].values
+
+# Assign standard instrumental uncertainties based on sensor limitations
+sigma_s = 0.001   # Estimated spatial resolution: 1 mm
+sigma_t = 0.0005  # Estimated temporal resolution: 0.5 ms
+
+# Initialize uncertainty-bearing arrays
+s_u = unp.uarray(displacement_data, sigma_s)
+t_u = unp.uarray(time_data, sigma_t)
+
+# Automate error propagation during numerical differentiation
+ds_u = s_u[1:] - s_u[:-1]
+dt_u = t_u[1:] - t_u[:-1]
+v_u = ds_u / dt_u
+
+# Extract nominal values and dynamically computed uncertainties
+velocity_vals = unp.nominal_values(v_u)
+velocity_errs = unp.std_devs(v_u)
+\end{pycode}
+
+\section*{A.2. Khớp mô hình và trích xuất ma trận hiệp phương sai (Curve Fitting and Covariance)}
+
+Kịch bản nền tảng cho phương pháp tối ưu hóa phi tuyến và tuyến tính, bao gồm việc thiết lập trọng số đo lường học thông qua đối số \texttt{absolute\_sigma=True} và đánh giá độ bất định của các tham số vật lý trực tiếp từ đường chéo của ma trận hiệp phương sai.
+
+\begin{pycode}{Kinematic regression templates}
+from scipy.optimize import curve_fit
+
+# Define Theoretical Models for Free Fall Kinematics
+def quadratic_displacement_model(t, g, v0, s0):
+    # s(t) = 0.5 * g * t^2 + v0 * t + s0
+    return 0.5 * g * t**2 + v0 * t + s0
+
+def linear_velocity_model(t, g, v0):
+    # v(t) = g * t + v0
+    return g * t + v0
+
+# Execute non-linear curve fitting for Displacement data
+popt_s, pcov_s = curve_fit(
+    quadratic_displacement_model,
+    time_data,
+    displacement_data,
+    sigma=np.full_like(displacement_data, sigma_s),
+    absolute_sigma=True,
+    p0=[9.8, 0.0, 0.0]
+)
+
+# Extract optimized parameters and their absolute standard deviations
+g_s_opt, v0_s_opt, s0_opt = popt_s
+g_s_err = np.sqrt(np.diag(pcov_s))[0]
+\end{pycode}
+
+\section*{A.3. Chẩn đoán thống kê và phân tích tập giá trị mô phỏng (Statistical Diagnostics)}
+
+Hệ thống mã lệnh chẩn đoán độc lập nhằm kiểm định mức độ tương thích của mô hình thông qua tham số \textit{Reduced Chi-Square}, nhận diện xu hướng của phần dư thông qua thuật toán làm trơn phi tham số \textit{LOWESS}, và đánh giá mức độ hội tụ của các tham số vật lý (như gia tốc $g$) bằng kỹ thuật thiết lập tập giá trị mô phỏng \textit{Monte Carlo}.
+
+\begin{pycode}{Advanced statistical evaluation and Monte Carlo inference}
+import statsmodels.api as sm
+
+# 1. Implement Reduced Chi-Square Metric for the Displacement Model
+residuals_s = displacement_data - quadratic_displacement_model(time_data, *popt_s)
+normalized_residuals_s = residuals_s / sigma_s
+chi_square_s = np.sum(normalized_residuals_s**2)
+degrees_of_freedom_s = len(displacement_data) - len(popt_s)
+reduced_chi_square_s = chi_square_s / degrees_of_freedom_s
+
+# 2. Residual Analysis and Non-parametric LOWESS Smoothing
+lowess_model = sm.nonparametric.lowess
+smoothed_residuals = lowess_model(residuals_s, time_data, frac=0.4)
+
+# 3. Monte Carlo Simulation for Parameter Uncertainty (Gravitational Acceleration)
+num_simulations = 5000
+np.random.seed(42)
+
+g_mc_results = np.zeros(num_simulations)
+
+for i in range(num_simulations):
+    # Inject Gaussian noise strictly aligned with instrumental uncertainties
+    s_simulated = displacement_data + np.random.normal(0, sigma_s, len(displacement_data))
+    t_simulated = time_data + np.random.normal(0, sigma_t, len(time_data))
+    
+    try:
+        popt_mc, _ = curve_fit(
+            quadratic_displacement_model,
+            t_simulated,
+            s_simulated,
+            p0=[9.8, 0.0, 0.0],
+            maxfev=2000
+        )
+        g_mc_results[i] = popt_mc[0]
+    except RuntimeError:
+        g_mc_results[i] = np.nan
+
+# Compute statistical limits from valid inferences
+g_mc_clean = g_mc_results[~np.isnan(g_mc_results)]
+g_mean = np.mean(g_mc_clean)
+g_std = np.std(g_mc_clean)
+\end{pycode}
+
+\begin{pitfall}{Xung đột không gian tên khi ghép nối mã nguồn (Namespace Collision)}{namespace_collision}
+Khi thao tác lắp ráp các đoạn mã nguyên mẫu từ cẩm nang tra cứu vào một kịch bản phân tích quy mô lớn, rủi ro ghi đè biến (variable overwriting) dễ xảy ra nếu không gian tên (namespace) không được quản lý chặt chẽ. Việc sử dụng lặp lại các định danh (như mảng \texttt{time\_data} hoặc bộ tham số \texttt{popt\_s}) qua nhiều lượt thử nghiệm trên các tập dữ liệu ngoại vi độc lập có thể dẫn đến hiện tượng rò rỉ dữ liệu (data leakage). Hệ quả là các thông số vật lý được ước lượng có khả năng mang giá trị sai lệch đáng kể so với bản chất thực nghiệm của hệ thống đo.
+\end{pitfall}
